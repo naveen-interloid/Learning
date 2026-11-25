@@ -1,0 +1,63 @@
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+        <meta name="description" content="Free Web tutorials">
+        <meta name="keywords" content="HTML CSS Javascript">
+        <style>
+            .main {
+                background-color: aquamarine;
+                width: 100px;
+                height: 100px;
+                margin: 20px;
+            }
+        </style>
+    </head>
+
+    <body>
+        Django
+        <p id="demo">Naveen <span style="display: none;">Amaldas</span></p>
+
+        <div class="main" class="first" ></div>
+        <div id="main" class="main"></div>
+        
+
+        <form>
+            <input type="text" placeholder="Enter a name">
+            <input type="email" placeholder="Enter a Email">
+            <input type="checkbox">
+            <input type="submit">
+        </form>
+
+        <script>
+            let x = document.getElementById("demo").innerHTML;
+            // console.log(x)
+            
+            let mainContainer = document.getElementsByClassName( "main" )
+
+            let html = document.querySelectorAll( "html" )
+
+            mainContainer[0].classList.add('Vikram')
+            // console.log(['main',"vikram"])
+
+            let man = document.querySelector('input[type=email]');
+            // man.style.cssText ="background-color:Yellow;color:black;";
+            Object.assign(man.style,{
+                padding:"10px"
+            })
+
+            man.addEventListener("input",(event)=>{
+                console.clear()
+                console.log(event.target.value)
+            })
+
+//             const element = document.getElementById("myElement");
+// element.classList.add("active");
+// element.classList.add("dark-mode", "highlighted"); // Add multiple classes
+
+            console.log()
+
+        </script>
+    </body>
+</html>
+

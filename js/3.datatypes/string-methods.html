@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>String Methods Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body { margin: 0; font-family: 'Courier New', monospace; }
+        .code-panel { position: fixed; left: 0; top: 0; width: 300px; height: 100vh; background: #1e1e1e; color: #fff; padding: 20px; overflow-y: auto; }
+        .canvas-container { margin-left: 300px; }
+        button { margin: 5px; padding: 8px; background: #333; color: #fff; border: none; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="code-panel">
+        <h3>String Methods</h3>
+        <textarea id="codeInput" placeholder="Try these examples:
+let str = 'Hello World';
+str.charAt(0);
+str.substring(0, 5);
+str.slice(6);
+str.toUpperCase();
+str.toLowerCase();
+str.split(' ');
+str.replace('World', 'JS');
+str.indexOf('o');
+str.length;" 
+        style="width: 260px; height: 200px; font-family: 'Courier New'; font-size: 12px; background: #333; color: #fff; border: 1px solid #555;"></textarea>
+        <br>
+        <button onclick="executeCode()">Execute & Animate</button>
+        <button onclick="reset()">Reset</button>
+        
+        <h4>Method Info:</h4>
+        <div id="method-info" style="background: #333; color: #0f0; padding: 10px; font-size: 11px; height: 150px; overflow-y: auto;"></div>
+    </div>
+    
+    <div class="canvas-container">
+        <script>
+            let strings = [];
+            let animationQueue = [];
+            let isAnimating = false;
+
+            function setup() {
+                createCanvas(windowWidth - 300, windowHeight);
+                textAlign(CENTER, CENTER);
+            }
+
+            function draw() {
+                background(245);
+                drawStrings();
+                
+                if (isAnimating && animationQueue.length > 0) {
+                    if (frameCount % 90 === 0) {
+                        processNextOperation();
+                    }
+                }
+            }
+
+            function drawStrings() {
+                fill(0);
+                textSize(20);
+                text("String Memory Visualization", width/2, 30);
+                
+                strings.forEach((str, index) => {
+                    drawString(str, 100 + index * 100);
+                });
+            }
+
+            function drawString(str, yPos) {
+                // String name
+                fill(0);
+                textSize(14);
+                text(str.name, 100, yPos - 20);
+                
+                // Character boxes
+                str.chars.forEach((char, index) => {
+                    let x = 100 + index * 30;
+                    
+                    // Character box
+                    fill(char.color || color(220, 255, 220));
+                    stroke(0);
+                    rect(x, yPos, 25, 40);
+                    
+                    // Index
+                    fill(100);
+                    textSize(8);
+                    text(index, x + 12, yPos - 5);
+                    
+                    // Character
+                    fill(0);
+                    textSize(12);
+                    text(char.value === ' ' ? '␣' : char.value, x + 12, yPos + 20);
+                });
+                
+                // Length indicator
+                fill(255, 100, 100);
+                textSize(12);
+                text(`length: ${str.chars.length}`, 100 + str.chars.length * 30 + 40, yPos + 20);
+            }
+
+            function executeCode() {
+                let code = document.getElementById('codeInput').value;
+                reset();
+                parseAndExecute(code);
+            }
+
+            function parseAndExecute(code) {
+                let lines = code.split('\n').filter(line => line.trim());
+                
+                lines.forEach(line => {
+                    line = line.trim();
+                    if (line.includes('=') && (line.includes("'") || line.includes('"'))) {
+                        parseStringDeclaration(line);
+                    } else if (line.includes('.')) {
+                        parseMethodCall(line);
+                    }
+                });
+                
+                isAnimating = true;
+            }
+
+            function parseStringDeclaration(line) {
+                let match = line.match(/let\s+(\w+)\s*=\s*['"]([^'"]*)['"]/);
+                if (match) {
+                    let [, name, value] = match;
+                    
+                    animationQueue.push({
+                        type: 'create',
+                        name: name,
+                        value: value
+                    });
+                }
+            }
+
+            function parseMethodCall(line) {
+                let match = line.match(/(\w+)\.(\w+)\(([^)]*)\)/);
+                if (match) {
+                    let [, stringName, method, args] = match;
+                    let argValues = args ? args.split(',').map(v => v.trim().replace(/['"]/g, '')) : [];
+                    
+                    animationQueue.push({
+                        type: 'method',
+                        stringName: stringName,
+                        method: method,
+                        args: argValues
+                    });
+                } else {
+                    // Handle property access like .length
+                    let propMatch = line.match(/(\w+)\.(\w+);?$/);
+                    if (propMatch) {
+                        let [, stringName, property] = propMatch;
+                        animationQueue.push({
+                            type: 'property',
+                            stringName: stringName,
+                            property: property
+                        });
+                    }
+                }
+            }
+
+            function processNextOperation() {
+                if (animationQueue.length === 0) {
+                    isAnimating = false;
+                    return;
+                }
+                
+                let operation = animationQueue.shift();
+                
+                if (operation.type === 'create') {
+                    createString(operation.name, operation.value);
+                } else if (operation.type === 'method') {
+                    executeMethod(operation);
+                } else if (operation.type === 'property') {
+                    executeProperty(operation);
+                }
+            }
+
+            function createString(name, value) {
+                let chars = value.split('').map(char => ({
+                    value: char,
+                    color: color(220, 255, 220)
+                }));
+                
+                strings.push({
+                    name: name,
+                    chars: chars,
+                    originalValue: value
+                });
+                
+                showMethodInfo(`Created string "${name}" with ${chars.length} characters`);
+            }
+
+            function executeMethod(operation) {
+                let string = strings.find(str => str.name === operation.stringName);
+                if (!string) return;
+                
+                switch(operation.method) {
+                    case 'charAt':
+                        let index = parseInt(operation.args[0]);
+                        let char = string.chars[index];
+                        if (char) {
+                            char.color = color(255, 150, 150);
+                        }
+                        showMethodInfo(`charAt(${index}) - Returns character at index ${index}: "${char ? char.value : 'undefined'}"`);
+                        break;
+                        
+                    case 'substring':
+                        let start = parseInt(operation.args[0]);
+                        let end = parseInt(operation.args[1]) || string.chars.length;
+                        let substringChars = string.chars.slice(start, end);
+                        
+                        // Highlight selected characters
+                        for (let i = start; i < end && i < string.chars.length; i++) {
+                            string.chars[i].color = color(255, 255, 150);
+                        }
+                        
+                        strings.push({
+                            name: `${string.name}_sub`,
+                            chars: substringChars.map(c => ({...c, color: color(200, 255, 200)})),
+                            originalValue: substringChars.map(c => c.value).join('')
+                        });
+                        showMethodInfo(`substring(${start}, ${end}) - Extracts characters from index ${start} to ${end}`);
+                        break;
+                        
+                    case 'slice':
+                        let sliceStart = parseInt(operation.args[0]);
+                        let sliceEnd = operation.args[1] ? parseInt(operation.args[1]) : string.chars.length;
+                        let slicedChars = string.chars.slice(sliceStart, sliceEnd);
+                        
+                        strings.push({
+                            name: `${string.name}_slice`,
+                            chars: slicedChars.map(c => ({...c, color: color(255, 200, 255)})),
+                            originalValue: slicedChars.map(c => c.value).join('')
+                        });
+                        showMethodInfo(`slice(${sliceStart}) - Extracts from index ${sliceStart} to end`);
+                        break;
+                        
+                    case 'toUpperCase':
+                        let upperChars = string.chars.map(c => ({
+                            value: c.value.toUpperCase(),
+                            color: color(150, 255, 255)
+                        }));
+                        
+                        strings.push({
+                            name: `${string.name}_upper`,
+                            chars: upperChars,
+                            originalValue: upperChars.map(c => c.value).join('')
+                        });
+                        showMethodInfo(`toUpperCase() - Converts all characters to uppercase`);
+                        break;
+                        
+                    case 'toLowerCase':
+                        let lowerChars = string.chars.map(c => ({
+                            value: c.value.toLowerCase(),
+                            color: color(255, 150, 255)
+                        }));
+                        
+                        strings.push({
+                            name: `${string.name}_lower`,
+                            chars: lowerChars,
+                            originalValue: lowerChars.map(c => c.value).join('')
+                        });
+                        showMethodInfo(`toLowerCase() - Converts all characters to lowercase`);
+                        break;
+                        
+                    case 'split':
+                        let delimiter = operation.args[0] || ' ';
+                        let parts = string.originalValue.split(delimiter);
+                        
+                        parts.forEach((part, index) => {
+                            strings.push({
+                                name: `${string.name}_split_${index}`,
+                                chars: part.split('').map(c => ({
+                                    value: c,
+                                    color: color(200, 200, 255)
+                                })),
+                                originalValue: part
+                            });
+                        });
+                        showMethodInfo(`split('${delimiter}') - Splits string into ${parts.length} parts`);
+                        break;
+                        
+                    case 'replace':
+                        let searchValue = operation.args[0];
+                        let replaceValue = operation.args[1];
+                        let newValue = string.originalValue.replace(searchValue, replaceValue);
+                        
+                        strings.push({
+                            name: `${string.name}_replaced`,
+                            chars: newValue.split('').map(c => ({
+                                value: c,
+                                color: color(255, 200, 150)
+                            })),
+                            originalValue: newValue
+                        });
+                        showMethodInfo(`replace('${searchValue}', '${replaceValue}') - Replaces first occurrence`);
+                        break;
+                        
+                    case 'indexOf':
+                        let searchChar = operation.args[0];
+                        let foundIndex = string.originalValue.indexOf(searchChar);
+                        
+                        if (foundIndex >= 0 && string.chars[foundIndex]) {
+                            string.chars[foundIndex].color = color(255, 100, 100);
+                        }
+                        showMethodInfo(`indexOf('${searchChar}') - Returns index: ${foundIndex}`);
+                        break;
+                }
+            }
+
+            function executeProperty(operation) {
+                let string = strings.find(str => str.name === operation.stringName);
+                if (!string) return;
+                
+                if (operation.property === 'length') {
+                    showMethodInfo(`length - String has ${string.chars.length} characters`);
+                }
+            }
+
+            function showMethodInfo(message) {
+                let infoDiv = document.getElementById('method-info');
+                infoDiv.innerHTML += `> ${message}<br>`;
+                infoDiv.scrollTop = infoDiv.scrollHeight;
+            }
+
+            function reset() {
+                strings = [];
+                animationQueue = [];
+                isAnimating = false;
+                document.getElementById('method-info').innerHTML = '';
+            }
+
+            function windowResized() {
+                resizeCanvas(windowWidth - 300, windowHeight);
+            }
+        </script>
+    </div>
+</body>
+</html>

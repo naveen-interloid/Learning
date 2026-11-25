@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JavaScript Variables - Memory Animation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body { margin: 0; font-family: 'Courier New', monospace; }
+        .code-panel { position: fixed; left: 0; top: 0; width: 300px; height: 100vh; background: #1e1e1e; color: #fff; padding: 20px; overflow-y: auto; }
+        .canvas-container { margin-left: 300px; }
+        .code-line { margin: 5px 0; padding: 5px; border-radius: 3px; }
+        .active { background: #333; }
+        button { margin: 5px; padding: 8px; }
+    </style>
+</head>
+<body>
+    <div class="code-panel">
+        <h3>JavaScript Code Input</h3>
+        <textarea id="codeInput" placeholder="Enter JavaScript code:
+let x = 5;
+let arr = [1,2,3];
+function myFunc() { return 42; }
+class MyClass { constructor(x) { this.x = x; } }" 
+        style="width: 260px; height: 150px; font-family: 'Courier New'; font-size: 12px;"></textarea>
+        <br>
+        <button onclick="executeCode()">Execute & Animate</button>
+        <button onclick="reset()">Reset</button>
+        
+        <h4>Execution Log:</h4>
+        <div id="execution-log" style="height: 200px; overflow-y: auto; background: #333; color: #0f0; padding: 10px; font-size: 11px;"></div>
+    </div>
+    
+    <div class="canvas-container">
+        <script>
+            let variables = [];
+            let executionLog = [];
+            let animationQueue = [];
+            let isAnimating = false;
+
+            function setup() {
+                createCanvas(windowWidth - 300, windowHeight);
+                textAlign(CENTER, CENTER);
+            }
+
+            function draw() {
+                background(245);
+                drawMemoryRegions();
+                drawVariables();
+                
+                if (isAnimating && animationQueue.length > 0) {
+                    if (frameCount % 60 === 0) { // Every second
+                        processNextAnimation();
+                    }
+                }
+            }
+
+            function drawMemoryRegions() {
+                // Stack
+                fill(220, 240, 255);
+                stroke(0);
+                rect(50, 50, 250, height - 100);
+                fill(0);
+                textSize(18);
+                text("STACK", 175, 80);
+                
+                // Heap
+                fill(255, 240, 220);
+                rect(350, 50, 300, height - 100);
+                text("HEAP", 500, 80);
+                
+                // Call Stack
+                fill(240, 255, 240);
+                rect(700, 50, 200, height - 100);
+                text("CALL STACK", 800, 80);
+            }
+
+            function drawVariables() {
+                for (let variable of variables) {
+                    variable.x = lerp(variable.x, variable.targetX, 0.1);
+                    variable.y = lerp(variable.y, variable.targetY, 0.1);
+                    
+                    fill(variable.color);
+                    stroke(0);
+                    rect(variable.x, variable.y, variable.width, variable.height);
+                    
+                    fill(0);
+                    textSize(10);
+                    text(variable.name, variable.x + variable.width/2, variable.y + 15);
+                    text(variable.value, variable.x + variable.width/2, variable.y + 35);
+                    
+                    if (variable.reference) {
+                        stroke(255, 0, 0);
+                        strokeWeight(2);
+                        line(variable.x + variable.width, variable.y + variable.height/2,
+                             variable.reference.x, variable.reference.y + variable.reference.height/2);
+                        strokeWeight(1);
+                    }
+                }
+            }
+
+            function executeCode() {
+                let code = document.getElementById('codeInput').value;
+                reset();
+                parseAndQueue(code);
+                isAnimating = true;
+            }
+
+            function parseAndQueue(code) {
+                let lines = code.split('\n').filter(line => line.trim());
+                
+                lines.forEach(line => {
+                    line = line.trim();
+                    if (line.startsWith('let ') || line.startsWith('const ') || line.startsWith('var ')) {
+                        queueVariableDeclaration(line);
+                    } else if (line.startsWith('function ')) {
+                        queueFunctionDeclaration(line);
+                    } else if (line.startsWith('class ')) {
+                        queueClassDeclaration(line);
+                    }
+                });
+            }
+
+            function queueVariableDeclaration(line) {
+                let match = line.match(/(let|const|var)\s+(\w+)\s*=\s*(.+);?/);
+                if (match) {
+                    let [, type, name, value] = match;
+                    animationQueue.push({
+                        type: 'variable',
+                        name: name,
+                        value: value.trim(),
+                        declarationType: type
+                    });
+                }
+            }
+
+            function queueFunctionDeclaration(line) {
+                let match = line.match(/function\s+(\w+)/);
+                if (match) {
+                    animationQueue.push({
+                        type: 'function',
+                        name: match[1],
+                        value: 'function()'
+                    });
+                }
+            }
+
+            function queueClassDeclaration(line) {
+                let match = line.match(/class\s+(\w+)/);
+                if (match) {
+                    animationQueue.push({
+                        type: 'class',
+                        name: match[1],
+                        value: 'class'
+                    });
+                }
+            }
+
+            function processNextAnimation() {
+                if (animationQueue.length === 0) {
+                    isAnimating = false;
+                    return;
+                }
+                
+                let item = animationQueue.shift();
+                executeItem(item);
+            }
+
+            function executeItem(item) {
+                log(`Executing: ${item.type} ${item.name}`);
+                
+                if (item.type === 'variable') {
+                    if (isPrimitive(item.value)) {
+                        createStackVariable(item.name, item.value, color(150, 255, 150));
+                        log(`${item.name} stored in STACK (primitive)`);
+                    } else {
+                        createReferenceVariable(item.name, item.value);
+                        log(`${item.name} reference in STACK, object in HEAP`);
+                    }
+                } else if (item.type === 'function') {
+                    createReferenceVariable(item.name, item.value, true);
+                    log(`Function ${item.name} stored in HEAP, reference in STACK`);
+                } else if (item.type === 'class') {
+                    createReferenceVariable(item.name, item.value, true);
+                    log(`Class ${item.name} constructor stored in HEAP`);
+                }
+            }
+
+            function isPrimitive(value) {
+                return /^(\d+|".*"|'.*'|true|false|null|undefined)$/.test(value);
+            }
+
+            function createStackVariable(name, value, varColor) {
+                let y = 120 + variables.filter(v => v.location === 'stack').length * 60;
+                variables.push({
+                    name: name,
+                    value: value,
+                    location: 'stack',
+                    x: 0,
+                    y: y,
+                    targetX: 70,
+                    targetY: y,
+                    width: 80,
+                    height: 50,
+                    color: varColor
+                });
+            }
+
+            function createReferenceVariable(name, value, isFunction = false) {
+                let stackY = 120 + variables.filter(v => v.location === 'stack').length * 60;
+                let heapY = 120 + variables.filter(v => v.location === 'heap').length * 60;
+                
+                // Stack reference
+                let stackVar = {
+                    name: name,
+                    value: 'ref→',
+                    location: 'stack',
+                    x: 0,
+                    y: stackY,
+                    targetX: 70,
+                    targetY: stackY,
+                    width: 80,
+                    height: 50,
+                    color: color(255, 255, 150)
+                };
+                
+                // Heap object
+                let heapVar = {
+                    name: '',
+                    value: value,
+                    location: 'heap',
+                    x: width,
+                    y: heapY,
+                    targetX: 370,
+                    targetY: heapY,
+                    width: 100,
+                    height: 50,
+                    color: isFunction ? color(200, 255, 200) : color(255, 200, 200)
+                };
+                
+                stackVar.reference = heapVar;
+                variables.push(stackVar, heapVar);
+            }
+
+            function log(message) {
+                executionLog.push(`> ${message}`);
+                let logDiv = document.getElementById('execution-log');
+                logDiv.innerHTML = executionLog.join('<br>');
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+
+            function reset() {
+                variables = [];
+                executionLog = [];
+                animationQueue = [];
+                isAnimating = false;
+                document.getElementById('execution-log').innerHTML = '';
+            }
+
+            function windowResized() {
+                resizeCanvas(windowWidth - 300, windowHeight);
+            }
+        </script>
+    </div>
+</body>
+</html>

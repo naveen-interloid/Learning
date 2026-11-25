@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Object Methods Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body { margin: 0; font-family: 'Courier New', monospace; }
+        .code-panel { position: fixed; left: 0; top: 0; width: 300px; height: 100vh; background: #1e1e1e; color: #fff; padding: 20px; overflow-y: auto; }
+        .canvas-container { margin-left: 300px; }
+        button { margin: 5px; padding: 8px; background: #333; color: #fff; border: none; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="code-panel">
+        <h3>Object Methods</h3>
+        <textarea id="codeInput" placeholder="Try these examples:
+let obj = {name: 'John', age: 30};
+obj.city = 'NYC';
+delete obj.age;
+Object.keys(obj);
+Object.values(obj);
+Object.entries(obj);
+obj.hasOwnProperty('name');
+Object.assign(obj, {job: 'dev'});
+JSON.stringify(obj);" 
+        style="width: 260px; height: 200px; font-family: 'Courier New'; font-size: 12px; background: #333; color: #fff; border: 1px solid #555;"></textarea>
+        <br>
+        <button onclick="executeCode()">Execute & Animate</button>
+        <button onclick="reset()">Reset</button>
+        
+        <h4>Method Info:</h4>
+        <div id="method-info" style="background: #333; color: #0f0; padding: 10px; font-size: 11px; height: 150px; overflow-y: auto;"></div>
+    </div>
+    
+    <div class="canvas-container">
+        <script>
+            let objects = [];
+            let animationQueue = [];
+            let isAnimating = false;
+
+            function setup() {
+                createCanvas(windowWidth - 300, windowHeight);
+                textAlign(CENTER, CENTER);
+            }
+
+            function draw() {
+                background(245);
+                drawObjects();
+                
+                if (isAnimating && animationQueue.length > 0) {
+                    if (frameCount % 90 === 0) {
+                        processNextOperation();
+                    }
+                }
+            }
+
+            function drawObjects() {
+                fill(0);
+                textSize(20);
+                text("Object Memory Visualization", width/2, 30);
+                
+                objects.forEach((obj, index) => {
+                    drawObject(obj, 100 + index * 200);
+                });
+            }
+
+            function drawObject(obj, yPos) {
+                // Object name
+                fill(0);
+                textSize(14);
+                text(obj.name, 150, yPos - 20);
+                
+                // Object container
+                fill(240, 240, 255);
+                stroke(0);
+                rect(50, yPos, 200, Math.max(100, obj.properties.length * 40 + 20));
+                
+                // Properties
+                obj.properties.forEach((prop, index) => {
+                    let propY = yPos + 30 + index * 35;
+                    
+                    // Property box
+                    fill(prop.color || color(255, 255, 220));
+                    stroke(0);
+                    rect(60, propY, 180, 30);
+                    
+                    // Property text
+                    fill(0);
+                    textSize(11);
+                    textAlign(LEFT, CENTER);
+                    text(`${prop.key}: ${prop.value}`, 70, propY + 15);
+                    textAlign(CENTER, CENTER);
+                });
+                
+                // Object info
+                fill(100);
+                textSize(10);
+                text(`Properties: ${obj.properties.length}`, 150, yPos + Math.max(100, obj.properties.length * 40 + 20) + 15);
+            }
+
+            function executeCode() {
+                let code = document.getElementById('codeInput').value;
+                reset();
+                parseAndExecute(code);
+            }
+
+            function parseAndExecute(code) {
+                let lines = code.split('\n').filter(line => line.trim());
+                
+                lines.forEach(line => {
+                    line = line.trim();
+                    if (line.includes('=') && line.includes('{')) {
+                        parseObjectDeclaration(line);
+                    } else if (line.includes('.') && line.includes('=') && !line.includes('(')) {
+                        parsePropertyAssignment(line);
+                    } else if (line.startsWith('delete ')) {
+                        parseDeleteOperation(line);
+                    } else if (line.includes('Object.') || line.includes('.hasOwnProperty') || line.includes('JSON.')) {
+                        parseMethodCall(line);
+                    }
+                });
+                
+                isAnimating = true;
+            }
+
+            function parseObjectDeclaration(line) {
+                let match = line.match(/let\s+(\w+)\s*=\s*\{([^}]*)\}/);
+                if (match) {
+                    let [, name, propsStr] = match;
+                    let properties = [];
+                    
+                    if (propsStr.trim()) {
+                        let propPairs = propsStr.split(',');
+                        properties = propPairs.map(pair => {
+                            let [key, value] = pair.split(':').map(s => s.trim().replace(/['"]/g, ''));
+                            return { key, value };
+                        });
+                    }
+                    
+                    animationQueue.push({
+                        type: 'create',
+                        name: name,
+                        properties: properties
+                    });
+                }
+            }
+
+            function parsePropertyAssignment(line) {
+                let match = line.match(/(\w+)\.(\w+)\s*=\s*['"]?([^'";\n]+)['"]?/);
+                if (match) {
+                    let [, objName, key, value] = match;
+                    animationQueue.push({
+                        type: 'assign',
+                        objName: objName,
+                        key: key,
+                        value: value.replace(/['"]/g, '')
+                    });
+                }
+            }
+
+            function parseDeleteOperation(line) {
+                let match = line.match(/delete\s+(\w+)\.(\w+)/);
+                if (match) {
+                    let [, objName, key] = match;
+                    animationQueue.push({
+                        type: 'delete',
+                        objName: objName,
+                        key: key
+                    });
+                }
+            }
+
+            function parseMethodCall(line) {
+                if (line.includes('Object.keys')) {
+                    let match = line.match(/Object\.keys\((\w+)\)/);
+                    if (match) {
+                        animationQueue.push({
+                            type: 'method',
+                            method: 'keys',
+                            objName: match[1]
+                        });
+                    }
+                } else if (line.includes('Object.values')) {
+                    let match = line.match(/Object\.values\((\w+)\)/);
+                    if (match) {
+                        animationQueue.push({
+                            type: 'method',
+                            method: 'values',
+                            objName: match[1]
+                        });
+                    }
+                } else if (line.includes('Object.entries')) {
+                    let match = line.match(/Object\.entries\((\w+)\)/);
+                    if (match) {
+                        animationQueue.push({
+                            type: 'method',
+                            method: 'entries',
+                            objName: match[1]
+                        });
+                    }
+                } else if (line.includes('hasOwnProperty')) {
+                    let match = line.match(/(\w+)\.hasOwnProperty\(['"](\w+)['"]\)/);
+                    if (match) {
+                        animationQueue.push({
+                            type: 'method',
+                            method: 'hasOwnProperty',
+                            objName: match[1],
+                            key: match[2]
+                        });
+                    }
+                } else if (line.includes('Object.assign')) {
+                    let match = line.match(/Object\.assign\((\w+),\s*\{([^}]*)\}/);
+                    if (match) {
+                        let [, objName, propsStr] = match;
+                        let newProps = [];
+                        if (propsStr.trim()) {
+                            let propPairs = propsStr.split(',');
+                            newProps = propPairs.map(pair => {
+                                let [key, value] = pair.split(':').map(s => s.trim().replace(/['"]/g, ''));
+                                return { key, value };
+                            });
+                        }
+                        animationQueue.push({
+                            type: 'method',
+                            method: 'assign',
+                            objName: objName,
+                            newProps: newProps
+                        });
+                    }
+                } else if (line.includes('JSON.stringify')) {
+                    let match = line.match(/JSON\.stringify\((\w+)\)/);
+                    if (match) {
+                        animationQueue.push({
+                            type: 'method',
+                            method: 'stringify',
+                            objName: match[1]
+                        });
+                    }
+                }
+            }
+
+            function processNextOperation() {
+                if (animationQueue.length === 0) {
+                    isAnimating = false;
+                    return;
+                }
+                
+                let operation = animationQueue.shift();
+                
+                switch(operation.type) {
+                    case 'create':
+                        createObject(operation.name, operation.properties);
+                        break;
+                    case 'assign':
+                        assignProperty(operation.objName, operation.key, operation.value);
+                        break;
+                    case 'delete':
+                        deleteProperty(operation.objName, operation.key);
+                        break;
+                    case 'method':
+                        executeMethod(operation);
+                        break;
+                }
+            }
+
+            function createObject(name, properties) {
+                let props = properties.map(prop => ({
+                    key: prop.key,
+                    value: prop.value,
+                    color: color(255, 255, 220)
+                }));
+                
+                objects.push({
+                    name: name,
+                    properties: props
+                });
+                
+                showMethodInfo(`Created object ${name} with ${props.length} properties`);
+            }
+
+            function assignProperty(objName, key, value) {
+                let obj = objects.find(o => o.name === objName);
+                if (!obj) return;
+                
+                let existingProp = obj.properties.find(p => p.key === key);
+                if (existingProp) {
+                    existingProp.value = value;
+                    existingProp.color = color(150, 255, 150);
+                    showMethodInfo(`Updated property ${key} = ${value}`);
+                } else {
+                    obj.properties.push({
+                        key: key,
+                        value: value,
+                        color: color(150, 255, 150)
+                    });
+                    showMethodInfo(`Added new property ${key} = ${value}`);
+                }
+            }
+
+            function deleteProperty(objName, key) {
+                let obj = objects.find(o => o.name === objName);
+                if (!obj) return;
+                
+                let propIndex = obj.properties.findIndex(p => p.key === key);
+                if (propIndex >= 0) {
+                    obj.properties.splice(propIndex, 1);
+                    showMethodInfo(`Deleted property ${key}`);
+                } else {
+                    showMethodInfo(`Property ${key} not found`);
+                }
+            }
+
+            function executeMethod(operation) {
+                let obj = objects.find(o => o.name === operation.objName);
+                if (!obj) return;
+                
+                switch(operation.method) {
+                    case 'keys':
+                        let keys = obj.properties.map(p => p.key);
+                        obj.properties.forEach(p => p.color = color(255, 200, 200));
+                        
+                        objects.push({
+                            name: `${obj.name}_keys`,
+                            properties: keys.map((key, index) => ({
+                                key: index,
+                                value: key,
+                                color: color(255, 200, 200)
+                            }))
+                        });
+                        showMethodInfo(`Object.keys() - Returns array of property names: [${keys.join(', ')}]`);
+                        break;
+                        
+                    case 'values':
+                        let values = obj.properties.map(p => p.value);
+                        obj.properties.forEach(p => p.color = color(200, 255, 200));
+                        
+                        objects.push({
+                            name: `${obj.name}_values`,
+                            properties: values.map((value, index) => ({
+                                key: index,
+                                value: value,
+                                color: color(200, 255, 200)
+                            }))
+                        });
+                        showMethodInfo(`Object.values() - Returns array of property values: [${values.join(', ')}]`);
+                        break;
+                        
+                    case 'entries':
+                        let entries = obj.properties.map(p => `[${p.key}, ${p.value}]`);
+                        obj.properties.forEach(p => p.color = color(200, 200, 255));
+                        
+                        objects.push({
+                            name: `${obj.name}_entries`,
+                            properties: entries.map((entry, index) => ({
+                                key: index,
+                                value: entry,
+                                color: color(200, 200, 255)
+                            }))
+                        });
+                        showMethodInfo(`Object.entries() - Returns array of [key, value] pairs`);
+                        break;
+                        
+                    case 'hasOwnProperty':
+                        let hasProp = obj.properties.some(p => p.key === operation.key);
+                        let targetProp = obj.properties.find(p => p.key === operation.key);
+                        if (targetProp) {
+                            targetProp.color = color(255, 150, 150);
+                        }
+                        showMethodInfo(`hasOwnProperty('${operation.key}') - Returns: ${hasProp}`);
+                        break;
+                        
+                    case 'assign':
+                        operation.newProps.forEach(newProp => {
+                            let existingProp = obj.properties.find(p => p.key === newProp.key);
+                            if (existingProp) {
+                                existingProp.value = newProp.value;
+                                existingProp.color = color(255, 255, 150);
+                            } else {
+                                obj.properties.push({
+                                    key: newProp.key,
+                                    value: newProp.value,
+                                    color: color(255, 255, 150)
+                                });
+                            }
+                        });
+                        showMethodInfo(`Object.assign() - Merged ${operation.newProps.length} properties`);
+                        break;
+                        
+                    case 'stringify':
+                        let jsonStr = '{' + obj.properties.map(p => `"${p.key}":"${p.value}"`).join(',') + '}';
+                        obj.properties.forEach(p => p.color = color(255, 200, 255));
+                        
+                        objects.push({
+                            name: `${obj.name}_json`,
+                            properties: [{
+                                key: 'JSON',
+                                value: jsonStr,
+                                color: color(255, 200, 255)
+                            }]
+                        });
+                        showMethodInfo(`JSON.stringify() - Converts object to JSON string`);
+                        break;
+                }
+            }
+
+            function showMethodInfo(message) {
+                let infoDiv = document.getElementById('method-info');
+                infoDiv.innerHTML += `> ${message}<br>`;
+                infoDiv.scrollTop = infoDiv.scrollHeight;
+            }
+
+            function reset() {
+                objects = [];
+                animationQueue = [];
+                isAnimating = false;
+                document.getElementById('method-info').innerHTML = '';
+            }
+
+            function windowResized() {
+                resizeCanvas(windowWidth - 300, windowHeight);
+            }
+        </script>
+    </div>
+</body>
+</html>

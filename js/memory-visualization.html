@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JavaScript Memory Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; }
+        .controls { padding: 20px; background: #f0f0f0; }
+        button { margin: 5px; padding: 10px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button onclick="showVariables()">Variables</button>
+        <button onclick="showFunctions()">Functions</button>
+        <button onclick="showClasses()">Classes</button>
+        <button onclick="reset()">Reset</button>
+    </div>
+    <script>
+        let memoryBlocks = [];
+        let currentStep = 0;
+        let animationSpeed = 60;
+        let showingType = '';
+
+        function setup() {
+            createCanvas(windowWidth, windowHeight - 100);
+            textAlign(CENTER, CENTER);
+        }
+
+        function draw() {
+            background(240);
+            
+            // Draw memory sections
+            drawMemoryLayout();
+            
+            // Draw animated blocks
+            for (let block of memoryBlocks) {
+                drawMemoryBlock(block);
+            }
+            
+            // Draw title
+            fill(0);
+            textSize(24);
+            text(`JavaScript Memory: ${showingType}`, width/2, 30);
+        }
+
+        function drawMemoryLayout() {
+            // Stack section
+            fill(200, 220, 255);
+            rect(50, 80, 300, 400);
+            fill(0);
+            textSize(16);
+            text("STACK", 200, 100);
+            
+            // Heap section
+            fill(255, 220, 200);
+            rect(400, 80, 400, 400);
+            text("HEAP", 600, 100);
+        }
+
+        function drawMemoryBlock(block) {
+            // Animate position
+            if (block.targetX !== block.x || block.targetY !== block.y) {
+                block.x = lerp(block.x, block.targetX, 0.1);
+                block.y = lerp(block.y, block.targetY, 0.1);
+            }
+            
+            // Draw block
+            fill(block.color);
+            rect(block.x, block.y, block.width, block.height);
+            
+            // Draw text
+            fill(0);
+            textSize(12);
+            text(block.name, block.x + block.width/2, block.y + 15);
+            text(block.value, block.x + block.width/2, block.y + 35);
+        }
+
+        function showVariables() {
+            reset();
+            showingType = 'Variables';
+            
+            // Primitive variables go to stack
+            setTimeout(() => addBlock('num', '42', 100, 150, color(100, 255, 100)), 500);
+            setTimeout(() => addBlock('str', '"hello"', 100, 200, color(100, 255, 100)), 1000);
+            setTimeout(() => addBlock('bool', 'true', 100, 250, color(100, 255, 100)), 1500);
+            
+            // Reference variables
+            setTimeout(() => {
+                addBlock('arr', 'ref→', 100, 300, color(255, 255, 100));
+                addBlock('array', '[1,2,3]', 450, 150, color(255, 200, 200));
+            }, 2000);
+            
+            setTimeout(() => {
+                addBlock('obj', 'ref→', 100, 350, color(255, 255, 100));
+                addBlock('object', '{a:1}', 450, 220, color(255, 200, 200));
+            }, 2500);
+        }
+
+        function showFunctions() {
+            reset();
+            showingType = 'Functions';
+            
+            // Function declaration
+            setTimeout(() => {
+                addBlock('myFunc', 'ref→', 100, 150, color(255, 255, 100));
+                addBlock('function', 'function()', 450, 150, color(200, 255, 200));
+            }, 500);
+            
+            // Function call creates execution context
+            setTimeout(() => {
+                addBlock('context', 'exec ctx', 100, 200, color(255, 200, 255));
+                addBlock('params', 'a=5, b=3', 100, 250, color(200, 200, 255));
+            }, 1500);
+            
+            setTimeout(() => {
+                addBlock('return', '8', 100, 300, color(255, 255, 200));
+            }, 2500);
+        }
+
+        function showClasses() {
+            reset();
+            showingType = 'Classes';
+            
+            // Class definition
+            setTimeout(() => {
+                addBlock('MyClass', 'ref→', 100, 150, color(255, 255, 100));
+                addBlock('constructor', 'class def', 450, 150, color(200, 255, 200));
+            }, 500);
+            
+            // Instance creation
+            setTimeout(() => {
+                addBlock('obj1', 'ref→', 100, 200, color(255, 255, 100));
+                addBlock('instance1', '{x:10}', 450, 220, color(255, 200, 200));
+            }, 1500);
+            
+            setTimeout(() => {
+                addBlock('obj2', 'ref→', 100, 250, color(255, 255, 100));
+                addBlock('instance2', '{x:20}', 450, 290, color(255, 200, 200));
+            }, 2500);
+            
+            // Prototype chain
+            setTimeout(() => {
+                addBlock('prototype', 'methods', 450, 360, color(200, 200, 255));
+            }, 3000);
+        }
+
+        function addBlock(name, value, x, y, blockColor) {
+            memoryBlocks.push({
+                name: name,
+                value: value,
+                x: x - 100,
+                y: y,
+                targetX: x,
+                targetY: y,
+                width: 80,
+                height: 50,
+                color: blockColor
+            });
+        }
+
+        function reset() {
+            memoryBlocks = [];
+            showingType = '';
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight - 100);
+        }
+    </script>
+</body>
+</html>

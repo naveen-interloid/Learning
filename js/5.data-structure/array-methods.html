@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Array Methods Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body { margin: 0; font-family: 'Courier New', monospace; }
+        .code-panel { position: fixed; left: 0; top: 0; width: 300px; height: 100vh; background: #1e1e1e; color: #fff; padding: 20px; overflow-y: auto; }
+        .canvas-container { margin-left: 300px; }
+        button { margin: 5px; padding: 8px; background: #333; color: #fff; border: none; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="code-panel">
+        <h3>Array Methods</h3>
+        <textarea id="codeInput" placeholder="Try these examples:
+let arr = [1, 2, 3];
+arr.push(4);
+arr.pop();
+arr.shift();
+arr.unshift(0);
+arr.splice(1, 1, 'new');
+arr.slice(0, 2);
+arr.map(x => x * 2);
+arr.filter(x => x > 1);" 
+        style="width: 260px; height: 200px; font-family: 'Courier New'; font-size: 12px; background: #333; color: #fff; border: 1px solid #555;"></textarea>
+        <br>
+        <button onclick="executeCode()">Execute & Animate</button>
+        <button onclick="reset()">Reset</button>
+        
+        <h4>Method Info:</h4>
+        <div id="method-info" style="background: #333; color: #0f0; padding: 10px; font-size: 11px; height: 150px; overflow-y: auto;"></div>
+    </div>
+    
+    <div class="canvas-container">
+        <script>
+            let arrays = [];
+            let operations = [];
+            let currentArray = null;
+            let animationQueue = [];
+            let isAnimating = false;
+
+            function setup() {
+                createCanvas(windowWidth - 300, windowHeight);
+                textAlign(CENTER, CENTER);
+            }
+
+            function draw() {
+                background(245);
+                drawArrays();
+                
+                if (isAnimating && animationQueue.length > 0) {
+                    if (frameCount % 90 === 0) {
+                        processNextOperation();
+                    }
+                }
+            }
+
+            function drawArrays() {
+                fill(0);
+                textSize(20);
+                text("Array Memory Visualization", width/2, 30);
+                
+                arrays.forEach((arr, index) => {
+                    drawArray(arr, 100 + index * 150);
+                });
+            }
+
+            function drawArray(arr, yPos) {
+                // Array name
+                fill(0);
+                textSize(14);
+                text(arr.name, 100, yPos - 20);
+                
+                // Array elements
+                arr.elements.forEach((element, index) => {
+                    let x = 100 + index * 60;
+                    
+                    // Element box
+                    fill(element.color || color(200, 220, 255));
+                    stroke(0);
+                    rect(x, yPos, 50, 40);
+                    
+                    // Index
+                    fill(100);
+                    textSize(10);
+                    text(index, x + 25, yPos - 10);
+                    
+                    // Value
+                    fill(0);
+                    textSize(12);
+                    text(element.value, x + 25, yPos + 20);
+                });
+                
+                // Length indicator
+                fill(255, 100, 100);
+                textSize(12);
+                text(`length: ${arr.elements.length}`, 100 + arr.elements.length * 60 + 30, yPos + 20);
+            }
+
+            function executeCode() {
+                let code = document.getElementById('codeInput').value;
+                reset();
+                parseAndExecute(code);
+            }
+
+            function parseAndExecute(code) {
+                let lines = code.split('\n').filter(line => line.trim());
+                
+                lines.forEach(line => {
+                    line = line.trim();
+                    if (line.includes('=') && line.includes('[')) {
+                        parseArrayDeclaration(line);
+                    } else if (line.includes('.')) {
+                        parseMethodCall(line);
+                    }
+                });
+                
+                isAnimating = true;
+            }
+
+            function parseArrayDeclaration(line) {
+                let match = line.match(/let\s+(\w+)\s*=\s*\[([^\]]*)\]/);
+                if (match) {
+                    let [, name, elements] = match;
+                    let values = elements ? elements.split(',').map(v => v.trim().replace(/['"]/g, '')) : [];
+                    
+                    animationQueue.push({
+                        type: 'create',
+                        name: name,
+                        values: values
+                    });
+                }
+            }
+
+            function parseMethodCall(line) {
+                let match = line.match(/(\w+)\.(\w+)\(([^)]*)\)/);
+                if (match) {
+                    let [, arrayName, method, args] = match;
+                    let argValues = args ? args.split(',').map(v => v.trim().replace(/['"]/g, '')) : [];
+                    
+                    animationQueue.push({
+                        type: 'method',
+                        arrayName: arrayName,
+                        method: method,
+                        args: argValues,
+                        originalLine: line
+                    });
+                }
+            }
+
+            function processNextOperation() {
+                if (animationQueue.length === 0) {
+                    isAnimating = false;
+                    return;
+                }
+                
+                let operation = animationQueue.shift();
+                
+                if (operation.type === 'create') {
+                    createArray(operation.name, operation.values);
+                } else if (operation.type === 'method') {
+                    executeMethod(operation);
+                }
+            }
+
+            function createArray(name, values) {
+                let elements = values.map(value => ({
+                    value: value,
+                    color: color(200, 220, 255)
+                }));
+                
+                arrays.push({
+                    name: name,
+                    elements: elements
+                });
+                
+                currentArray = arrays[arrays.length - 1];
+                showMethodInfo(`Created array ${name} with ${elements.length} elements`);
+            }
+
+            function executeMethod(operation) {
+                let array = arrays.find(arr => arr.name === operation.arrayName);
+                if (!array) return;
+                
+                let originalLength = array.elements.length;
+                
+                switch(operation.method) {
+                    case 'push':
+                        array.elements.push({
+                            value: operation.args[0],
+                            color: color(150, 255, 150)
+                        });
+                        showMethodInfo(`push(${operation.args[0]}) - Adds element to end. New length: ${array.elements.length}`);
+                        break;
+                        
+                    case 'pop':
+                        let popped = array.elements.pop();
+                        showMethodInfo(`pop() - Removes last element: ${popped ? popped.value : 'undefined'}. New length: ${array.elements.length}`);
+                        break;
+                        
+                    case 'shift':
+                        let shifted = array.elements.shift();
+                        showMethodInfo(`shift() - Removes first element: ${shifted ? shifted.value : 'undefined'}. New length: ${array.elements.length}`);
+                        break;
+                        
+                    case 'unshift':
+                        array.elements.unshift({
+                            value: operation.args[0],
+                            color: color(255, 150, 150)
+                        });
+                        showMethodInfo(`unshift(${operation.args[0]}) - Adds element to beginning. New length: ${array.elements.length}`);
+                        break;
+                        
+                    case 'splice':
+                        let start = parseInt(operation.args[0]);
+                        let deleteCount = parseInt(operation.args[1]);
+                        let newElement = operation.args[2];
+                        
+                        if (newElement) {
+                            array.elements.splice(start, deleteCount, {
+                                value: newElement,
+                                color: color(255, 255, 150)
+                            });
+                        } else {
+                            array.elements.splice(start, deleteCount);
+                        }
+                        showMethodInfo(`splice(${operation.args.join(',')}) - Modifies array at index ${start}. New length: ${array.elements.length}`);
+                        break;
+                        
+                    case 'slice':
+                        let sliceStart = parseInt(operation.args[0]) || 0;
+                        let sliceEnd = parseInt(operation.args[1]) || array.elements.length;
+                        let sliced = array.elements.slice(sliceStart, sliceEnd);
+                        
+                        arrays.push({
+                            name: `${array.name}_sliced`,
+                            elements: sliced.map(el => ({...el, color: color(200, 255, 200)}))
+                        });
+                        showMethodInfo(`slice(${operation.args.join(',')}) - Creates new array with elements from index ${sliceStart} to ${sliceEnd}`);
+                        break;
+                        
+                    case 'map':
+                        let mapped = array.elements.map(el => ({
+                            value: `${el.value}*2`,
+                            color: color(255, 200, 255)
+                        }));
+                        
+                        arrays.push({
+                            name: `${array.name}_mapped`,
+                            elements: mapped
+                        });
+                        showMethodInfo(`map() - Creates new array with transformed elements`);
+                        break;
+                        
+                    case 'filter':
+                        let filtered = array.elements.filter(el => parseInt(el.value) > 1);
+                        
+                        arrays.push({
+                            name: `${array.name}_filtered`,
+                            elements: filtered.map(el => ({...el, color: color(150, 255, 255)}))
+                        });
+                        showMethodInfo(`filter() - Creates new array with elements that pass the test`);
+                        break;
+                }
+            }
+
+            function showMethodInfo(message) {
+                let infoDiv = document.getElementById('method-info');
+                infoDiv.innerHTML += `> ${message}<br>`;
+                infoDiv.scrollTop = infoDiv.scrollHeight;
+            }
+
+            function reset() {
+                arrays = [];
+                animationQueue = [];
+                isAnimating = false;
+                document.getElementById('method-info').innerHTML = '';
+            }
+
+            function windowResized() {
+                resizeCanvas(windowWidth - 300, windowHeight);
+            }
+        </script>
+    </div>
+</body>
+</html>
